@@ -1,5 +1,0 @@
-CUS-001	Nguyễn Thị Lan	0901000001	1200	Gold
-CUS-002	Trần Văn Minh	0901000002	650	Silver
-CUS-003	Lê Thị Hoa	0901000003	100	Bronze
-CUS-004	Phạm Quốc Bảo	0901000004	0	Bronze
-CUS-005	Đặng Thu Hà	0901000005	520	Silver

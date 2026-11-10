@@ -1,5 +1,0 @@
-CAT-001	Thuốc giảm đau	Giảm đau, hạ sốt thông thường
-CAT-002	Kháng sinh	Thuốc kê đơn, cần đơn hợp lệ
-CAT-003	Vật tư y tế	Băng gạc và vật tư sơ cứu
-CAT-004	Vitamin	Bổ sung vitamin và khoáng chất
-CAT-005	Dung dịch y tế	Nước muối và dung dịch chăm sóc
