@@ -6,6 +6,9 @@ public class ChiTietPhieuXuat {
     private String medicineId;
     private int quantity;
     private double unitPrice;
+    private int saleQuantity;
+    private String unitName = "đơn vị";
+    private String batchAllocations = "";
 
     public ChiTietPhieuXuat() {
     }
@@ -16,6 +19,7 @@ public class ChiTietPhieuXuat {
         this.medicineId = medicineId;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
+        this.saleQuantity = quantity;
     }
 
     public String getDetailId() { return detailId; }
@@ -28,9 +32,18 @@ public class ChiTietPhieuXuat {
     public void setQuantity(int quantity) { this.quantity = quantity; }
     public double getUnitPrice() { return unitPrice; }
     public void setUnitPrice(double unitPrice) { this.unitPrice = unitPrice; }
+    public int getSaleQuantity() { return saleQuantity; }
+    public String getUnitName() { return unitName; }
+    public String getBatchAllocations() { return batchAllocations; }
+
+    public void setSaleDetails(int saleQuantity, String unitName, String batchAllocations) {
+        this.saleQuantity = saleQuantity;
+        this.unitName = unitName;
+        this.batchAllocations = batchAllocations == null ? "" : batchAllocations;
+    }
 
     public double getLineTotal() {
-        return quantity * unitPrice;
+        return saleQuantity * unitPrice;
     }
 
     @Override

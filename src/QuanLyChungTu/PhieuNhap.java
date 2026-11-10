@@ -12,6 +12,7 @@ public class PhieuNhap implements IThanhToan {
     private LocalDate importDate;
     private double totalAmount;
     private List<String> medicineIds = new ArrayList<>();
+    private List<ChiTietPhieuNhap> details = new ArrayList<>();
 
     public PhieuNhap() {
         this.importDate = LocalDate.now();
@@ -37,11 +38,23 @@ public class PhieuNhap implements IThanhToan {
     public void setTotalAmount(double totalAmount) { this.totalAmount = totalAmount; }
     public List<String> getMedicineIds() { return medicineIds; }
     public void setMedicineIds(List<String> medicineIds) { this.medicineIds = medicineIds; }
+    public List<ChiTietPhieuNhap> getDetails() { return details; }
+    public void setDetails(List<ChiTietPhieuNhap> details) { this.details = details; }
 
     public void addMedicine(String medicineId) {
         if (!medicineIds.contains(medicineId)) {
             medicineIds.add(medicineId);
         }
+    }
+
+    public void addDetail(String medicineId, int quantity, double unitPrice) {
+        addDetail(medicineId, "", null, quantity, unitPrice);
+    }
+
+    public void addDetail(String medicineId, String batchNumber, LocalDate expiryDate,
+                          int quantity, double unitPrice) {
+        addMedicine(medicineId);
+        details.add(new ChiTietPhieuNhap(medicineId, batchNumber, expiryDate, quantity, unitPrice));
     }
 
     @Override

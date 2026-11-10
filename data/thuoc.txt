@@ -1,0 +1,5 @@
+MED-001	Paracetamol 500mg	CAT-001	Dược Hậu Giang	500.0	998	2027-12-31	false	100	viên	vỉ	10	hộp	10
+MED-002	Amoxicillin 500mg	CAT-002	Traphaco	4000.0	49	2027-10-30	true	50	viên	vỉ	10	hộp	10
+MED-003	Gạc vô trùng 10x10	CAT-003	Kim Sora	8000.0	798	2028-06-30	false	100	miếng	gói	10	hộp	10
+MED-004	Vitamin C 500mg	CAT-004	DHG Pharma	700.0	598	2027-09-30	false	100	viên	vỉ	10	hộp	10
+MED-005	Nước muối sinh lý 0.9%	CAT-005	B.Braun	10000.0	1198	2027-05-31	false	100	chai		1		1

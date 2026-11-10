@@ -14,6 +14,6 @@ public class ThuocKeDon extends SanPhamYTe {
 
     @Override
     public double tinhGiaBan() {
-        return getUnitPrice() + (getUnitPrice() * 0.1);
+        return getUnitPrice() * 1.05; // Giá bán = Giá nhập * 1.05 (tăng 5%)
     }
 }

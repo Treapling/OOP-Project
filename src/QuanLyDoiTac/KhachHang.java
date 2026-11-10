@@ -22,6 +22,9 @@ public class KhachHang extends Nguoi {
     public void setMemberTier(String memberTier) { this.memberTier = memberTier; }
 
     public void addPoints(int points) {
+        if (points <= 0) {
+            return;
+        }
         this.loyaltyPoints += points;
         updateTier();
     }

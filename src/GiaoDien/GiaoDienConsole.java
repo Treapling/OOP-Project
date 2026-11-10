@@ -2,6 +2,7 @@ package GiaoDien;
 
 import QuanLyChungTu.DonThuoc;
 import QuanLyChungTu.InBaoCao;
+import QuanLyChungTu.MaTuDong;
 import QuanLyChungTu.PhieuNhap;
 import QuanLyChungTu.PhieuXuat;
 import QuanLyChungTu.QuanLyBanHang;
@@ -16,17 +17,23 @@ import QuanLyKhoBai.QuanLyNhapKho;
 import QuanLyPhanLoai.LoaiThuoc;
 import QuanLyPhanLoai.QuanLyLoaiThuoc;
 import QuanLySanPham.DanhSachThuoc;
+import QuanLySanPham.DonViTinh;
+import QuanLySanPham.LoThuoc;
 import QuanLySanPham.SanPhamYTe;
 import QuanLySanPham.ThuocKeDon;
 import QuanLySanPham.ThuocKhongKeDon;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.nio.charset.StandardCharsets;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 public class GiaoDienConsole {
     private static final String LINE = "--------------------------------------------------------------------------";
@@ -39,6 +46,7 @@ public class GiaoDienConsole {
     private final QuanLyBanHang quanLyBanHang;
     private final QuanLyNhapKho quanLyNhapKho;
     private final QuanLyDonThuoc quanLyDonThuoc;
+    private final Path dataDirectory;
 
     public GiaoDienConsole(
             QuanLyLoaiThuoc quanLyLoaiThuoc,
@@ -48,7 +56,8 @@ public class GiaoDienConsole {
             QuanLyNhaCungCap quanLyNhaCungCap,
             QuanLyBanHang quanLyBanHang,
             QuanLyNhapKho quanLyNhapKho,
-            QuanLyDonThuoc quanLyDonThuoc
+            QuanLyDonThuoc quanLyDonThuoc,
+            Path dataDirectory
     ) {
         this.quanLyLoaiThuoc = quanLyLoaiThuoc;
         this.danhSachThuoc = danhSachThuoc;
@@ -58,6 +67,7 @@ public class GiaoDienConsole {
         this.quanLyBanHang = quanLyBanHang;
         this.quanLyNhapKho = quanLyNhapKho;
         this.quanLyDonThuoc = quanLyDonThuoc;
+        this.dataDirectory = dataDirectory;
     }
 
     public void run() {
@@ -70,13 +80,14 @@ public class GiaoDienConsole {
                     "5. Khách hàng, nhân viên, nhà cung cấp",
                     "6. Toa thuốc",
                     "7. Báo cáo doanh thu",
+                    "8. Trạng thái file dữ liệu",
                     "0. Thoát");
             Integer choice = readInt("  Lựa chọn: ");
             if (choice == null || choice == 0) {
                 System.out.println("\n  Đã thoát chương trình. Tạm biệt!");
                 return;
             }
-            if (choice < 0 || choice > 7) {
+            if (choice < 0 || choice > 8) {
                 invalidChoice();
                 continue;
             }
@@ -102,6 +113,9 @@ public class GiaoDienConsole {
                 case 7:
                     showRevenueReport();
                     break;
+                case 8:
+                    showDataFiles();
+                    break;
                 default:
                     System.out.println("  Không có lựa chọn này. Vui lòng chọn từ 0 đến 7.");
             }
@@ -112,7 +126,8 @@ public class GiaoDienConsole {
         while (true) {
             printMedicines(danhSachThuoc.getAllMedicines(), "DANH SÁCH THUỐC");
             printSubmenu("1. Thêm thuốc", "2. Sửa thuốc", "3. Xóa thuốc",
-                    "4. Thuốc sắp hết hạn", "0. Quay lại");
+                    "4. Thuốc/lô sắp hết hạn", "5. Tìm kiếm kết hợp",
+                    "6. Cảnh báo tồn dưới định mức", "7. Xem các lô đang quản lý", "0. Quay lại");
             Integer choice = readInt("  Lựa chọn: ");
             if (choice == null || choice == 0) return;
             switch (choice) {
@@ -127,6 +142,9 @@ public class GiaoDienConsole {
                         System.out.println("  Số ngày phải lớn hơn hoặc bằng 0.");
                     }
                     break;
+                case 5: searchMedicine(); break;
+                case 6: printLowStock(); break;
+                case 7: manageBatches(); break;
                 default: invalidChoice();
             }
         }
@@ -134,17 +152,21 @@ public class GiaoDienConsole {
 
     private void printMedicines(List<SanPhamYTe> medicines, String title) {
         System.out.println("\n  " + title);
-        System.out.printf("  %-8s %-22s %-10s %14s %8s %-12s %s%n",
-                "Mã", "Tên thuốc", "Mã loại", "Giá bán", "Tồn", "Hạn dùng", "Cần toa");
+        System.out.printf("  %-8s %-22s %-10s %12s %8s %8s %-12s %s%n",
+                "Mã", "Tên thuốc", "Mã loại", "Giá/" + "đv gốc", "Tồn", "ĐM", "Hạn gần nhất", "Cần toa");
         System.out.println("  " + LINE);
         if (medicines.isEmpty()) {
             System.out.println("  Chưa có dữ liệu.");
         }
         for (SanPhamYTe medicine : medicines) {
-            System.out.printf("  %-8s %-22s %-10s %14s %8d %-12s %s%n",
+            System.out.printf("  %-8s %-22s %-10s %12s %8d %8d %-12s %s%n",
                     medicine.getMedicineId(), medicine.getName(), medicine.getCategoryId(),
-                    money(medicine.tinhGiaBan()), medicine.getQuantityInStock(),
+                    money(medicine.tinhGiaBan()), medicine.getQuantityInStock(), medicine.getReorderLevel(),
                     medicine.getExpiryDate(), medicine.isPrescriptionRequired() ? "Có" : "Không");
+            System.out.println("           Đơn vị: " + medicine.getSellUnits().stream()
+                    .map(unit -> unit.getName() + " (" + unit.getFactorToBase() + " "
+                            + medicine.getBaseUnitName() + ")")
+                    .collect(Collectors.joining(", ")));
         }
     }
 
@@ -157,8 +179,10 @@ public class GiaoDienConsole {
         Integer quantity = readInt("  Số lượng tồn: ");
         LocalDate expiry = readDate("  Hạn dùng (yyyy-MM-dd): ");
         Boolean requiresPrescription = readYesNo("  Thuốc cần toa? (c/k): ");
+        Integer reorderLevel = readInt("  Tồn kho tối thiểu: ");
         if (id == null || name == null || categoryId == null || manufacturer == null
-                || price == null || quantity == null || expiry == null || requiresPrescription == null) {
+                || price == null || quantity == null || expiry == null || requiresPrescription == null
+                || reorderLevel == null) {
             return;
         }
         if (quanLyLoaiThuoc.getCategory(categoryId) == null) {
@@ -169,13 +193,14 @@ public class GiaoDienConsole {
             System.out.println("  Mã thuốc đã tồn tại.");
             return;
         }
-        if (price < 0 || quantity < 0) {
-            System.out.println("  Giá và số lượng không được âm.");
+        if (price < 0 || quantity < 0 || reorderLevel < 0) {
+            System.out.println("  Giá, số lượng và định mức không được âm.");
             return;
         }
-        boolean added = danhSachThuoc.addMedicine(createMedicine(
-                id, name, categoryId, manufacturer, price, quantity, expiry, requiresPrescription));
-        if (added) saveMedicines();
+        SanPhamYTe medicine = createMedicine(id, name, categoryId, manufacturer,
+                price, quantity, expiry, requiresPrescription);
+        if (!configureUnits(medicine, null, reorderLevel)) return;
+        boolean added = danhSachThuoc.addMedicine(medicine);
         System.out.println(added ? "  Đã thêm thuốc." : "  Không thể thêm thuốc. Hãy kiểm tra mã thuốc.");
     }
 
@@ -191,20 +216,27 @@ public class GiaoDienConsole {
         String categoryId = readText("  Mã loại mới: ");
         String manufacturer = readText("  Nhà sản xuất mới: ");
         Double price = readDouble("  Giá bán mới: ");
-        Integer quantity = readInt("  Số lượng tồn mới: ");
-        LocalDate expiry = readDate("  Hạn dùng mới (yyyy-MM-dd): ");
+        LocalDate expiry;
+        if (danhSachThuoc.hasBatchTracking()) {
+            expiry = current.getExpiryDate();
+            System.out.println("  Hạn dùng do từng lô quyết định; chỉnh hạn dùng trong bước nhập lô.");
+        } else {
+            expiry = readDate("  Hạn dùng mới (yyyy-MM-dd): ");
+        }
         Boolean requiresPrescription = readYesNo("  Cần toa? (c/k): ");
+        Integer reorderLevel = readInt("  Tồn kho tối thiểu mới: ");
         if (name == null || categoryId == null || manufacturer == null || price == null
-                || quantity == null || expiry == null || requiresPrescription == null) return;
-        if (quanLyLoaiThuoc.getCategory(categoryId) == null || price < 0 || quantity < 0) {
-            System.out.println("  Mã loại không tồn tại, hoặc giá/số lượng không hợp lệ.");
+                || requiresPrescription == null || reorderLevel == null) return;
+        if (quanLyLoaiThuoc.getCategory(categoryId) == null || price < 0 || reorderLevel < 0) {
+            System.out.println("  Mã loại không tồn tại, hoặc giá/định mức không hợp lệ.");
             return;
         }
         SanPhamYTe updated = createMedicine(id, name, categoryId, manufacturer,
-                price, quantity, expiry, requiresPrescription);
+                price, current.getQuantityInStock(), expiry, requiresPrescription);
+        if (!configureUnits(updated, current, reorderLevel)) return;
         boolean saved = danhSachThuoc.updateMedicine(updated);
-        if (saved) saveMedicines();
-        System.out.println(saved ? "  Đã cập nhật thuốc." : "  Cập nhật thất bại.");
+        System.out.println(saved ? "  Đã cập nhật thuốc."
+                : "  Cập nhật thất bại. Tồn kho được điều chỉnh qua nhập kho, bán hàng hoặc lô.");
     }
 
     private void deleteMedicine() {
@@ -222,8 +254,104 @@ public class GiaoDienConsole {
             return;
         }
         boolean deleted = danhSachThuoc.deleteMedicine(id);
-        if (deleted) saveMedicines();
         System.out.println(deleted ? "  Đã xóa thuốc." : "  Không tìm thấy thuốc.");
+    }
+
+    private boolean configureUnits(SanPhamYTe medicine, SanPhamYTe existing, int reorderLevel) {
+        String base = readText("  Đơn vị nhỏ nhất (viên/chai/miếng...): ");
+        String middle = readOptionalText("  Đơn vị trung gian (bỏ trống nếu không có): ");
+        if (base == null || middle == null) return false;
+        int middleFactor = 1;
+        if (!middle.isBlank()) {
+            Integer factor = readInt("  Số đơn vị nhỏ nhất trong 1 " + middle + ": ");
+            if (factor == null) return false;
+            middleFactor = factor;
+        }
+        String outer = readOptionalText("  Đơn vị đóng gói lớn nhất (bỏ trống nếu không có): ");
+        if (outer == null) return false;
+        int outerFactor = 1;
+        if (!outer.isBlank()) {
+            if (middle.isBlank()) {
+                System.out.println("  Cần khai báo đơn vị trung gian trước đơn vị đóng gói lớn nhất.");
+                return false;
+            }
+            Integer factor = readInt("  Số " + middle + " trong 1 " + outer + ": ");
+            if (factor == null) return false;
+            outerFactor = factor;
+        }
+        try {
+            medicine.setUnitConfiguration(base, middle, middleFactor, outer, outerFactor);
+        } catch (IllegalArgumentException e) {
+            System.out.println("  Quy cách đơn vị không hợp lệ.");
+            return false;
+        }
+        if (existing != null && existing.getQuantityInStock() > 0
+                && (!existing.getBaseUnitName().equals(medicine.getBaseUnitName())
+                    || !existing.getMiddleUnitName().equals(medicine.getMiddleUnitName())
+                    || existing.getMiddleToBaseFactor() != medicine.getMiddleToBaseFactor()
+                    || !existing.getOuterUnitName().equals(medicine.getOuterUnitName())
+                    || existing.getOuterToMiddleFactor() != medicine.getOuterToMiddleFactor())) {
+            System.out.println("  Không thể đổi quy cách khi còn tồn; cần quy đổi/kiểm kê tồn kho trước.");
+            return false;
+        }
+        medicine.setReorderLevel(reorderLevel);
+        return true;
+    }
+
+    private void searchMedicine() {
+        String keyword = readOptionalText("  Từ khóa gần đúng (mã/tên/hãng): ");
+        String category = readOptionalText("  Lọc theo mã loại (bỏ trống nếu không): ");
+        String manufacturer = readOptionalText("  Lọc theo hãng (bỏ trống nếu không): ");
+        if (keyword == null || category == null || manufacturer == null) return;
+        printMedicines(danhSachThuoc.searchMedicines(keyword, category, manufacturer, null, false),
+                "KẾT QUẢ TÌM KIẾM");
+    }
+
+    private void printLowStock() {
+        List<SanPhamYTe> lowStock = danhSachThuoc.getLowStockMedicines();
+        printMedicines(lowStock, "ĐỀ XUẤT BỔ SUNG TỒN KHO");
+        for (SanPhamYTe medicine : lowStock) {
+            long suggested = Math.max(0L, (long) medicine.getReorderLevel() * 2
+                    - danhSachThuoc.getAvailableStock(medicine.getMedicineId()));
+            System.out.println("  Gợi ý: lập phiếu nhập cho " + medicine.getMedicineId()
+                    + ", nhập khoảng " + suggested + " " + medicine.getBaseUnitName()
+                    + " để phục hồi mức mục tiêu 2 x định mức.");
+        }
+    }
+
+    private void manageBatches() {
+        while (true) {
+            printBatches();
+            printSubmenu("1. Thu hồi/cách ly lô", "0. Quay lại");
+            Integer choice = readInt("  Lựa chọn: ");
+            if (choice == null || choice == 0) return;
+            if (choice == 1) {
+                String batchNumber = readText("  Số lô cần thu hồi: ");
+                if (batchNumber != null) {
+                    System.out.println(danhSachThuoc.recallBatch(batchNumber)
+                            ? "  Đã cách ly lô khỏi bán hàng."
+                            : "  Không tìm thấy lô hoặc lô đã được thu hồi.");
+                }
+            } else {
+                invalidChoice();
+            }
+        }
+    }
+
+    private void printBatches() {
+        System.out.println("\n  THEO DÕI LÔ THUỐC (FEFO: xuất lô hết hạn trước)");
+        System.out.printf("  %-10s %-20s %-26s %-12s %10s %s%n",
+                "Mã thuốc", "Số lô", "Tên thuốc", "Hạn dùng", "Tồn", "Trạng thái");
+        System.out.println("  " + LINE);
+        for (LoThuoc batch : danhSachThuoc.getAllBatches()) {
+            SanPhamYTe medicine = danhSachThuoc.getMedicine(batch.getMedicineId());
+            String status = batch.isRecalled() ? "ĐÃ THU HỒI"
+                    : batch.getExpiryDate().isBefore(LocalDate.now()) ? "ĐÃ HẾT HẠN"
+                    : batch.getExpiryDate().isBefore(LocalDate.now().plusDays(90)) ? "Sắp hết hạn" : "Còn hạn";
+            System.out.printf("  %-10s %-20s %-26s %-12s %10d %s%n",
+                    batch.getMedicineId(), batch.getBatchNumber(), medicine.getName(),
+                    batch.getExpiryDate(), batch.getQuantity(), status);
+        }
     }
 
     private void manageCategories() {
@@ -319,9 +447,7 @@ public class GiaoDienConsole {
         String medicineId = readText("  Mã thuốc: ");
         String customerId = readText("  Mã khách hàng: ");
         String employeeId = readText("  Mã nhân viên: ");
-        Integer quantity = readInt("  Số lượng: ");
-        String payment = readText("  Phương thức thanh toán: ");
-        if (medicineId == null || customerId == null || employeeId == null || quantity == null || payment == null) {
+        if (medicineId == null || customerId == null || employeeId == null) {
             return;
         }
         SanPhamYTe medicine = danhSachThuoc.getMedicine(medicineId);
@@ -330,8 +456,32 @@ public class GiaoDienConsole {
             System.out.println("  Không tìm thấy thuốc, khách hàng hoặc nhân viên.");
             return;
         }
-        if (quantity <= 0 || medicine.getQuantityInStock() < quantity) {
-            System.out.println("  Số lượng không hợp lệ hoặc tồn kho không đủ.");
+        List<DonViTinh> sellUnits = medicine.getSellUnits();
+        System.out.println("  Đơn vị bán:");
+        for (int i = 0; i < sellUnits.size(); i++) {
+            DonViTinh unit = sellUnits.get(i);
+            System.out.println("  " + (i + 1) + ". " + unit.getName() + " = " + unit.getFactorToBase()
+                    + " " + medicine.getBaseUnitName() + ", giá "
+                    + money(medicine.tinhGiaBan() * unit.getFactorToBase()));
+        }
+        Integer unitIndex = readInt("  Chọn đơn vị bán: ");
+        Integer quantity = readInt("  Số lượng theo đơn vị đã chọn: ");
+        String payment = readText("  Phương thức thanh toán: ");
+        if (unitIndex == null || quantity == null || payment == null) return;
+        if (unitIndex < 1 || unitIndex > sellUnits.size() || quantity <= 0) {
+            System.out.println("  Đơn vị hoặc số lượng không hợp lệ.");
+            return;
+        }
+        DonViTinh selectedUnit = sellUnits.get(unitIndex - 1);
+        int baseQuantity;
+        try {
+            baseQuantity = Math.multiplyExact(quantity, selectedUnit.getFactorToBase());
+        } catch (ArithmeticException e) {
+            System.out.println("  Số lượng quy đổi vượt giới hạn.");
+            return;
+        }
+        if (medicine.getQuantityInStock() < baseQuantity) {
+            System.out.println("  Tồn kho không đủ theo đơn vị nhỏ nhất.");
             return;
         }
         if (medicine.isPrescriptionRequired()) {
@@ -342,14 +492,13 @@ public class GiaoDienConsole {
                 return;
             }
         }
-        String invoiceId = "HD" + System.currentTimeMillis();
+        String invoiceId = MaTuDong.taoMa("HD");
         PhieuXuat invoice = quanLyBanHang.createInvoice(invoiceId, customerId, employeeId, payment);
-        if (!quanLyBanHang.addMedicineToInvoice(invoiceId, medicineId, quantity)) {
-            System.out.println("  Bán thuốc thất bại. Kiểm tra số lượng tồn kho.");
+        if (!quanLyBanHang.addMedicineToInvoice(invoiceId, medicineId, quantity, selectedUnit.getName())) {
+            System.out.println("  Bán thất bại. Kiểm tra hạn dùng từng lô và tồn kho khả dụng.");
             return;
         }
         quanLyBanHang.finalizeInvoice(invoiceId);
-        saveMedicines();
         System.out.println("  Tạo hóa đơn thành công: " + invoiceId);
         System.out.println("  Tổng thanh toán: " + money(invoice.getTotalAmount()));
     }
@@ -375,16 +524,24 @@ public class GiaoDienConsole {
         for (PhieuNhap note : quanLyNhapKho.getAllImportNotes()) {
             System.out.printf("  %-12s %-12s %-12s %-12s %14s %s%n",
                     note.getImportNoteId(), note.getSupplierId(), note.getEmployeeId(),
-                    note.getImportDate(), money(note.getTotalAmount()), String.join(", ", note.getMedicineIds()));
+                    note.getImportDate(), money(note.getTotalAmount()),
+                    note.getDetails().stream()
+                            .map(detail -> detail.getMedicineId() + " [" + detail.getBatchNumber() + "] x"
+                                    + detail.getQuantity() + " HSD " + detail.getExpiryDate()
+                                    + " @" + money(detail.getUnitPrice()))
+                            .collect(Collectors.joining(", ")));
         }
     }
 
     private void importMedicineStock() {
         String noteId = readText("  Mã phiếu nhập: ");
         String medicineId = readText("  Mã thuốc: ");
+        String batchNumber = readText("  Số lô nhà sản xuất: ");
+        LocalDate expiry = readDate("  Hạn dùng của lô (yyyy-MM-dd): ");
         Integer quantity = readInt("  Số lượng nhập: ");
-        Double price = readDouble("  Giá nhập mỗi đơn vị: ");
-        if (noteId == null || medicineId == null || quantity == null || price == null) return;
+        Double price = readDouble("  Giá nhập mỗi đơn vị nhỏ nhất: ");
+        if (noteId == null || medicineId == null || batchNumber == null || expiry == null
+                || quantity == null || price == null) return;
         if (quantity <= 0 || price < 0) {
             System.out.println("  Số lượng phải lớn hơn 0 và giá nhập không được âm.");
             return;
@@ -393,18 +550,18 @@ public class GiaoDienConsole {
             System.out.println("  Không tìm thấy phiếu nhập hoặc thuốc.");
             return;
         }
-        boolean imported = quanLyNhapKho.importMedicine(noteId, medicineId, quantity, price);
-        if (imported) saveMedicines();
+        boolean imported = quanLyNhapKho.importMedicine(noteId, medicineId, batchNumber, expiry, quantity, price);
         System.out.println(imported
                 ? "  Nhập kho thành công."
                 : "  Nhập kho thất bại. Kiểm tra mã phiếu và mã thuốc.");
     }
 
     private void createImportNote() {
-        String id = readText("  Mã phiếu nhập: ");
+        String id = readOptionalText("  Mã phiếu nhập (bỏ trống để tự tạo): ");
         String supplierId = readText("  Mã nhà cung cấp: ");
         String employeeId = readText("  Mã nhân viên: ");
         if (id == null || supplierId == null || employeeId == null) return;
+        if (id.isBlank()) id = MaTuDong.taoMa("PN");
         if (quanLyNhapKho.getImportNote(id) != null) {
             System.out.println("  Mã phiếu nhập đã tồn tại.");
             return;
@@ -697,7 +854,7 @@ public class GiaoDienConsole {
     }
 
     private void addPrescription() {
-        String id = readText("  Mã toa: ");
+        String id = readOptionalText("  Mã toa (bỏ trống để tự tạo): ");
         String customerId = readText("  Mã khách hàng: ");
         String patient = readText("  Tên bệnh nhân: ");
         String doctor = readText("  Tên bác sĩ: ");
@@ -705,6 +862,7 @@ public class GiaoDienConsole {
         if (id == null || customerId == null || patient == null || doctor == null || medicineId == null) {
             return;
         }
+        if (id.isBlank()) id = MaTuDong.taoMa("TOA");
         if (quanLyKhachHang.getCustomer(customerId) == null || danhSachThuoc.getMedicine(medicineId) == null) {
             System.out.println("  Không tìm thấy khách hàng hoặc thuốc.");
             return;
@@ -723,7 +881,7 @@ public class GiaoDienConsole {
         while (true) {
             System.out.println("\n  BÁO CÁO");
             printSubmenu("1. Doanh thu hôm nay", "2. Doanh thu theo tháng",
-                    "3. Thuốc sắp hết hạn", "0. Quay lại");
+                    "3. Thuốc/lô sắp hết hạn", "4. Thống kê kho đa chiều", "0. Quay lại");
             Integer choice = readInt("  Lựa chọn: ");
             if (choice == null || choice == 0) return;
             InBaoCao report = new InBaoCao(quanLyBanHang.getAllInvoices());
@@ -744,13 +902,79 @@ public class GiaoDienConsole {
                 Integer days = readInt("  Số ngày tới hạn cần xem: ");
                 if (days != null && days >= 0) {
                     printMedicines(danhSachThuoc.filterExpiringSoon(days), "THUỐC SẮP HẾT HẠN");
+                    for (LoThuoc batch : danhSachThuoc.filterExpiringBatches(days)) {
+                        System.out.println("  Lô " + batch.getBatchNumber() + " / "
+                                + batch.getMedicineId() + " / " + batch.getExpiryDate()
+                                + " / tồn " + batch.getQuantity());
+                    }
                 } else if (days != null) {
                     System.out.println("  Số ngày phải lớn hơn hoặc bằng 0.");
                 }
+            } else if (choice == 4) {
+                showInventoryStatistics();
             } else {
                 invalidChoice();
             }
         }
+    }
+
+    private void showInventoryStatistics() {
+        Map<String, long[]> byCategory = new LinkedHashMap<>();
+        long prescriptionCount = 0;
+        long otcCount = 0;
+        long totalUnits = 0;
+        double stockValue = 0;
+        for (SanPhamYTe medicine : danhSachThuoc.getAllMedicines()) {
+            long[] totals = byCategory.computeIfAbsent(medicine.getCategoryId(), ignored -> new long[2]);
+            totals[0] += medicine.getQuantityInStock();
+            totals[1]++;
+            totalUnits += medicine.getQuantityInStock();
+            stockValue += medicine.getQuantityInStock() * medicine.getUnitPrice();
+            if (medicine.isPrescriptionRequired()) prescriptionCount++;
+            else otcCount++;
+        }
+        System.out.println("\n  THỐNG KÊ TỒN KHO");
+        System.out.println("  Số mặt hàng: " + danhSachThuoc.getAllMedicines().size()
+                + " | Tổng tồn theo đơn vị gốc: " + totalUnits
+                + " | Giá trị tồn theo giá nhập/đơn vị gốc: " + money(stockValue));
+        System.out.println("  Thuốc kê đơn: " + prescriptionCount + " | Không kê đơn/vật tư: " + otcCount);
+        System.out.println("  Theo loại thuốc:");
+        for (Map.Entry<String, long[]> entry : byCategory.entrySet()) {
+            LoaiThuoc category = quanLyLoaiThuoc.getCategory(entry.getKey());
+            System.out.println("  - " + entry.getKey() + " (" + (category == null ? "chưa phân loại" : category.getName())
+                    + "): " + entry.getValue()[1] + " mặt hàng, tồn " + entry.getValue()[0]);
+        }
+        long expiredUnits = danhSachThuoc.filterExpiringBatches(0).stream()
+                .filter(batch -> batch.getExpiryDate().isBefore(LocalDate.now()))
+                .mapToLong(LoThuoc::getQuantity).sum();
+        long expiringUnits = danhSachThuoc.filterExpiringBatches(90).stream()
+                .filter(batch -> !batch.getExpiryDate().isBefore(LocalDate.now()))
+                .mapToLong(LoThuoc::getQuantity).sum();
+        System.out.println("  Tồn đã hết hạn: " + expiredUnits
+                + " | Tồn hết hạn trong 90 ngày: " + expiringUnits
+                + " | Mặt hàng dưới định mức: " + danhSachThuoc.getLowStockMedicines().size());
+    }
+
+    private void showDataFiles() {
+        String[] files = {"thuoc.txt", "lo-thuoc.txt", "loai-thuoc.txt", "khach-hang.txt",
+                "nhan-vien.txt", "nha-cung-cap.txt", "hoa-don.txt", "phieu-nhap.txt", "toa-thuoc.txt"};
+        System.out.println("\n  FILE DỮ LIỆU ĐANG ĐƯỢC ỨNG DỤNG SỬ DỤNG");
+        System.out.println("  Thư mục: " + dataDirectory.toAbsolutePath().normalize());
+        for (String fileName : files) {
+            Path file = dataDirectory.resolve(fileName);
+            if (!Files.isRegularFile(file)) {
+                System.out.println("  [THIẾU] " + fileName + " -> " + file.toAbsolutePath());
+                continue;
+            }
+            try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                long rows = reader.lines().filter(line -> !line.isBlank()).count();
+                System.out.println("  [OK] " + fileName + " | " + rows + " bản ghi | " + Files.size(file)
+                        + " bytes | " + file.toAbsolutePath());
+            } catch (IOException e) {
+                System.out.println("  [LỖI ĐỌC] " + file.toAbsolutePath() + " | " + e.getMessage());
+            }
+        }
+        System.out.println("  Đây là file văn bản TSV, không phải database SQL; mở bằng editor để xem trường chi tiết.");
     }
 
     private void printSubmenu(String... options) {
@@ -809,6 +1033,12 @@ public class GiaoDienConsole {
         return value;
     }
 
+    private String readOptionalText(String prompt) {
+        System.out.print(prompt);
+        if (!input.hasNextLine()) return null;
+        return input.nextLine().trim();
+    }
+
     private Integer readInt(String prompt) {
         while (input.hasNextLine()) {
             System.out.print(prompt);
@@ -862,14 +1092,6 @@ public class GiaoDienConsole {
             return new ThuocKeDon(id, name, categoryId, manufacturer, price, quantity, expiry);
         }
         return new ThuocKhongKeDon(id, name, categoryId, manufacturer, price, quantity, expiry);
-    }
-
-    private void saveMedicines() {
-        try {
-            danhSachThuoc.ghiFile(Path.of("data", "thuoc.csv").toString());
-        } catch (IOException e) {
-            throw new UncheckedIOException("Không thể lưu danh sách thuốc.", e);
-        }
     }
 
     private String money(double amount) {

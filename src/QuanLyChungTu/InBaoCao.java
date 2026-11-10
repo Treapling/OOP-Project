@@ -15,17 +15,24 @@ public class InBaoCao {
     public double getDailyRevenue(LocalDate date) {
         double total = 0;
         for (PhieuXuat invoice : invoiceHistory) {
-            if (invoice != null && invoice.getCreatedAt() != null && invoice.getCreatedAt().toLocalDate().equals(date)) {
+            if (invoice != null && invoice.isPaid() && invoice.getCreatedAt() != null
+                    && invoice.getCreatedAt().toLocalDate().equals(date)) {
                 total += invoice.getTotalAmount();
             }
+
         }
         return total;
+    }
+
+    public long getInvoiceCount(LocalDate date) {
+        return invoiceHistory.stream().filter(invoice -> invoice != null && invoice.isPaid()
+                && invoice.getCreatedAt() != null && invoice.getCreatedAt().toLocalDate().equals(date)).count();
     }
 
     public double getMonthlyRevenue(int year, int month) {
         double total = 0;
         for (PhieuXuat invoice : invoiceHistory) {
-            if (invoice != null && invoice.getCreatedAt() != null) {
+            if (invoice != null && invoice.isPaid() && invoice.getCreatedAt() != null) {
                 if (invoice.getCreatedAt().getYear() == year && invoice.getCreatedAt().getMonthValue() == month) {
                     total += invoice.getTotalAmount();
                 }

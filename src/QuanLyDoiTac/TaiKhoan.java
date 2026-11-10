@@ -31,7 +31,7 @@ public class TaiKhoan {
     public void setActive(boolean active) { this.active = active; }
 
     public boolean checkPassword(String inputPassword) {
-        return password.equals(inputPassword);
+        return password != null && password.equals(inputPassword);
     }
 
     @Override
